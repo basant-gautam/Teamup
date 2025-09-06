@@ -532,7 +532,78 @@ app.get("/api/profile", authenticateUser, async (req, res) => {
   }
 });
 
-// Teammates with filtering and pagination
+// Teammates search endpoint
+app.get("/api/search/teammates", authenticateUser, async (req, res) => {
+  try {
+    console.log('Search request received:', req.query);
+    // Get search parameters
+    const { skills, availability } = req.query;
+    
+    // Check if MongoDB is available
+    if (mongoose.connection.readyState === 1) {
+      try {
+        // Build search query
+        let query = {};
+        
+        if (skills && skills.trim() !== '') {
+          // Create a case-insensitive regex pattern for skill search
+          const skillPattern = new RegExp(skills.trim(), 'i');
+          // Search for skills as strings in array
+          query.skills = { $elemMatch: { $regex: skillPattern } };
+        }
+        
+        if (availability && availability !== 'Any Availability') {
+          query.availability = availability;
+        }
+        
+        console.log('MongoDB search query:', query);
+        
+        // Find teammates matching the search criteria
+        const teammates = await Teammate.find(query);
+        console.log('MongoDB search results:', teammates.length, 'teammates found');
+        
+        return res.json({
+          success: true,
+          teammates
+        });
+      } catch (mongoError) {
+        console.error("MongoDB search error:", mongoError);
+        // Continue to in-memory if MongoDB fails
+      }
+    }
+    
+    // Fallback to in-memory search
+    console.log('Using in-memory search fallback');
+    let results = [...inMemoryTeammates];
+    
+    if (skills && skills.trim() !== '') {
+      const searchSkill = skills.trim().toLowerCase();
+      results = results.filter(t => 
+        t.skills.some(skill => 
+          skill.toLowerCase().includes(searchSkill)
+        )
+      );
+      console.log('Filtered by skills:', results.length, 'results');
+    }
+    
+    if (availability && availability !== 'Any Availability') {
+      results = results.filter(t => t.availability === availability);
+    }
+    
+    return res.json({
+      success: true,
+      teammates: results
+    });
+  } catch (error) {
+    console.error("Search error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error performing search"
+    });
+  }
+});
+
+// Original teammates endpoint with filtering and pagination
 app.get("/api/teammates", authenticateUser, async (req, res) => {
   try {
     // Get query parameters
