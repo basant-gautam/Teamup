@@ -170,6 +170,33 @@ document.addEventListener('DOMContentLoaded', function() {
         const skills = Array.isArray(teammate.skills) ? teammate.skills.join(', ') : 
                         (teammate.skills || 'No skills listed');
         
+        // Format GitHub links
+        const githubLinks = teammate.githubLinks && teammate.githubLinks.length > 0 
+          ? teammate.githubLinks.map(link => `<a href="${link}" target="_blank" class="github-link">🔗 ${link}</a>`).join('<br>')
+          : 'No GitHub links';
+        
+        // Format projects
+        const projects = teammate.projects && teammate.projects.length > 0
+          ? teammate.projects.map(project => `
+              <div class="project-item">
+                <strong>${project.name}</strong>
+                ${project.description ? `<p class="project-desc">${project.description.substring(0, 100)}${project.description.length > 100 ? '...' : ''}</p>` : ''}
+                ${project.technologies && project.technologies.length > 0 ? `<p class="project-tech">Tech: ${project.technologies.join(', ')}</p>` : ''}
+                ${project.githubUrl ? `<a href="${project.githubUrl}" target="_blank" class="project-github">View on GitHub</a>` : ''}
+              </div>
+            `).join('')
+          : '<p class="no-projects">No projects listed</p>';
+        
+        // Format achievements
+        const achievements = teammate.achievements && teammate.achievements.length > 0
+          ? teammate.achievements.map(achievement => `
+              <div class="achievement-item">
+                <span class="achievement-type">${achievement.type}</span>
+                <strong>${achievement.title}</strong>
+              </div>
+            `).join('')
+          : '<p class="no-achievements">No achievements listed</p>';
+        
         return `
           <div class="teammate-card">
             <img src="${teammate.avatar || 'https://randomuser.me/api/portraits/lego/1.jpg'}" 
@@ -178,6 +205,22 @@ document.addEventListener('DOMContentLoaded', function() {
             <p><strong>Skills:</strong> ${skills}</p>
             <p><strong>Availability:</strong> ${teammate.availability || 'Not specified'}</p>
             <p><strong>Bio:</strong> ${teammate.bio || 'No bio available'}</p>
+            
+            <div class="github-section">
+              <p><strong>GitHub:</strong></p>
+              <div class="github-links">${githubLinks}</div>
+            </div>
+            
+            <div class="projects-section">
+              <p><strong>Projects:</strong></p>
+              <div class="projects-list">${projects}</div>
+            </div>
+            
+            <div class="achievements-section">
+              <p><strong>Achievements:</strong></p>
+              <div class="achievements-list">${achievements}</div>
+            </div>
+            
             <button onclick="showConnectionModal('${teammate.name}', '${teammate._id || teammate.id || 'ID-' + Math.random().toString(36).substr(2, 9)}', '123-456-7890')" class="connect-btn">
               Connect
             </button>

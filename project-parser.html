@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Parser - Extract Projects from Resume</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .upload-section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            border: 2px dashed #007bff;
+        }
+        .file-input {
+            margin: 15px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            width: 100%;
+        }
+        button {
+            background: linear-gradient(45deg, #007bff, #0056b3);
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            margin: 10px 5px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(0,123,255,0.3);
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,123,255,0.4);
+        }
+        .parse-btn {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            box-shadow: 0 4px 15px rgba(40,167,69,0.3);
+        }
+        .results {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 5px solid #007bff;
+        }
+        .project-card {
+            background: white;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border-left: 4px solid #28a745;
+        }
+        .project-title {
+            color: #333;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .project-description {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+        .tech-tags {
+            margin: 10px 0;
+        }
+        .tech-tag {
+            display: inline-block;
+            background: linear-gradient(45deg, #007bff, #0056b3);
+            color: white;
+            padding: 4px 12px;
+            margin: 3px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .project-date {
+            background: #e9ecef;
+            color: #495057;
+            padding: 4px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+        .github-link {
+            display: inline-block;
+            background: #28a745;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 12px;
+            margin-top: 10px;
+            transition: all 0.3s;
+        }
+        .github-link:hover {
+            background: #218838;
+            transform: translateY(-1px);
+        }
+        .stats {
+            background: linear-gradient(45deg, #17a2b8, #138496);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .loading {
+            text-align: center;
+            padding: 30px;
+            color: #666;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #f5c6cb;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #c3e6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Project Parser</h1>
+            <p>Upload your resume to extract and analyze your projects</p>
+        </div>
+        
+        <div class="upload-section">
+            <h3>📄 Upload Resume</h3>
+            <p>Supported formats: PDF, DOC, DOCX</p>
+            <input type="file" id="resumeFile" accept=".pdf,.doc,.docx" class="file-input">
+            <br>
+            <button onclick="parseProjects()" class="parse-btn">🔍 Parse Projects</button>
+            <button onclick="testWithSample()">📋 Test with Sample Resume</button>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        async function parseProjects() {
+            const fileInput = document.getElementById('resumeFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a resume file first');
+                return;
+            }
+
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="loading">🔄 Analyzing resume and extracting projects...</div>';
+
+            try {
+                const formData = new FormData();
+                formData.append('resume', file);
+
+                const response = await fetch('/api/debug/resume-text', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayProjectResults(data.data);
+                } else {
+                    resultsDiv.innerHTML = `<div class="error">❌ Error: ${data.message}</div>`;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                resultsDiv.innerHTML = `<div class="error">❌ Network error: ${error.message}</div>`;
+            }
+        }
+
+        async function testWithSample() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="loading">🔄 Testing with sample resume data...</div>';
+
+            const sampleResumeText = `
+John Doe
+Software Developer
+Email: john.doe@email.com
+GitHub: https://github.com/johndoe
+
+PROJECTS
+
+E-Commerce Platform
+March 2024 - May 2024
+Built a full-stack e-commerce application using React, Node.js, and PostgreSQL. Implemented payment processing with Stripe API and deployed on AWS. Features include user authentication, shopping cart, and admin dashboard.
+Technologies: React, Node.js, PostgreSQL, Express, Stripe, AWS
+GitHub: https://github.com/johndoe/ecommerce-platform
+
+Task Management App
+January 2024 - February 2024
+Developed a collaborative task management application with real-time updates using Socket.io. Implemented drag-and-drop functionality and integrated with Google Calendar API.
+Technologies: Vue.js, Express.js, MongoDB, Socket.io, Google Calendar API
+GitHub: https://github.com/johndoe/task-manager
+
+Data Visualization Dashboard
+October 2023 - December 2023
+Created an interactive dashboard for analyzing sales data using Python and D3.js. Implemented machine learning models for sales prediction and automated report generation.
+Technologies: Python, Django, PostgreSQL, D3.js, Scikit-learn, Pandas
+GitHub: https://github.com/johndoe/data-dashboard
+
+Mobile Weather App
+August 2023 - September 2023
+Built a cross-platform mobile app using React Native. Integrated with OpenWeatherMap API for real-time weather data and implemented location-based services.
+Technologies: React Native, JavaScript, OpenWeatherMap API, Expo
+
+SKILLS
+Programming: JavaScript, Python, Java, TypeScript
+Web Technologies: React, Vue.js, Angular, HTML, CSS
+Backend: Node.js, Express, Django, Flask
+Databases: MongoDB, PostgreSQL, MySQL
+Cloud: AWS, Docker, Kubernetes
+            `;
+
+            try {
+                const textBlob = new Blob([sampleResumeText], { type: 'text/plain' });
+                const textFile = new File([textBlob], 'sample_resume.txt', { type: 'text/plain' });
+                
+                const formData = new FormData();
+                formData.append('resume', textFile);
+
+                const response = await fetch('/api/debug/resume-text', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayProjectResults(data.data);
+                } else {
+                    resultsDiv.innerHTML = `<div class="error">❌ Error: ${data.message}</div>`;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                resultsDiv.innerHTML = `<div class="error">❌ Network error: ${error.message}</div>`;
+            }
+        }
+
+        function displayProjectResults(data) {
+            const resultsDiv = document.getElementById('results');
+            
+            let html = '';
+            
+            // Stats
+            html += `
+                <div class="stats">
+                    <h3>📊 Extraction Summary</h3>
+                    <p><strong>Total Projects Found:</strong> ${data.extractedProjects.length}</p>
+                    <p><strong>GitHub Links Found:</strong> ${data.extractedGithubLinks.length}</p>
+                    <p><strong>Technologies Identified:</strong> ${data.extractedSkills.length}</p>
+                </div>
+            `;
+
+            if (data.extractedProjects.length > 0) {
+                html += '<div class="results"><h3>🚀 Extracted Projects</h3>';
+                
+                data.extractedProjects.forEach((project, index) => {
+                    html += `
+                        <div class="project-card">
+                            <div class="project-title">
+                                ${index + 1}. ${project.name}
+                            </div>
+                            
+                            ${project.date ? `<div class="project-date">📅 ${project.date}</div>` : ''}
+                            
+                            ${project.description ? `
+                                <div class="project-description">
+                                    📝 ${project.description}
+                                </div>
+                            ` : ''}
+                            
+                            ${project.technologies && project.technologies.length > 0 ? `
+                                <div class="tech-tags">
+                                    <strong>🛠️ Technologies:</strong><br>
+                                    ${project.technologies.map(tech => `<span class="tech-tag">${tech}</span>`).join('')}
+                                </div>
+                            ` : ''}
+                            
+                            ${project.githubUrl ? `
+                                <a href="${project.githubUrl}" target="_blank" class="github-link">
+                                    🔗 View on GitHub
+                                </a>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+            } else {
+                html += `
+                    <div class="results">
+                        <h3>🚀 Projects</h3>
+                        <div class="error">
+                            ❌ No projects found in the resume. 
+                            <br><br>
+                            <strong>Tips for better project detection:</strong>
+                            <ul>
+                                <li>Include a "Projects" section in your resume</li>
+                                <li>Start each project with a clear title</li>
+                                <li>Include project descriptions and technologies used</li>
+                                <li>Add dates when possible</li>
+                            </ul>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // GitHub Links
+            if (data.extractedGithubLinks.length > 0) {
+                html += `
+                    <div class="results">
+                        <h3>🔗 GitHub Links Found</h3>
+                        ${data.extractedGithubLinks.map(link => `
+                            <a href="${link}" target="_blank" class="github-link">${link}</a>
+                        `).join('<br>')}
+                    </div>
+                `;
+            }
+
+            // All Skills
+            if (data.extractedSkills.length > 0) {
+                html += `
+                    <div class="results">
+                        <h3>🛠️ Technologies & Skills Found</h3>
+                        <div class="tech-tags">
+                            ${data.extractedSkills.map(skill => `<span class="tech-tag">${skill}</span>`).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            resultsDiv.innerHTML = html;
+        }
+    </script>
+</body>
+</html>

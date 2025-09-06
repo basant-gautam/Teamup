@@ -18,6 +18,7 @@ const SKILLS_KEYWORDS = {
   mobile: ["flutter", "react native", "ios", "android", "swift"],
   design: ["figma", "sketch", "adobe xd", "ui/ux", "photoshop", "illustrator"]
 };
+
 function extractSkills(text) {
   const extracted = new Set();
   const cleanedText = text.toLowerCase();
@@ -31,6 +32,308 @@ function extractSkills(text) {
   });
   return Array.from(extracted);
 }
+
+// Extract GitHub links from resume text
+function extractGitHubLinks(text) {
+  const githubLinks = [];
+  console.log('Extracting GitHub links from text length:', text.length);
+  
+  // More comprehensive regex patterns for GitHub URLs
+  const patterns = [
+    // Full URLs
+    /https?:\/\/github\.com\/[\w\-\.]+\/[\w\-\.]+/gi,
+    /https?:\/\/www\.github\.com\/[\w\-\.]+\/[\w\-\.]+/gi,
+    // Without protocol
+    /(?:www\.)?github\.com\/[\w\-\.]+\/[\w\-\.]+/gi,
+    // Just domain and username
+    /(?:www\.)?github\.com\/[\w\-\.]+/gi,
+    // GitHub mentions in text
+    /github:\s*[\w\-\.]+\/[\w\-\.]+/gi,
+    /github:\s*[\w\-\.]+/gi,
+    // URLs in different formats
+    /(?:GitHub|Github|github):\s*https?:\/\/github\.com\/[\w\-\.]+(?:\/[\w\-\.]+)?/gi,
+    // Links in parentheses or brackets
+    /\(https?:\/\/github\.com\/[\w\-\.]+(?:\/[\w\-\.]+)?\)/gi,
+    /\[https?:\/\/github\.com\/[\w\-\.]+(?:\/[\w\-\.]+)?\]/gi
+  ];
+  
+  patterns.forEach((pattern, index) => {
+    const matches = text.match(pattern);
+    console.log(`Pattern ${index + 1} matches:`, matches);
+    if (matches) {
+      matches.forEach(match => {
+        // Clean up the match
+        let cleanMatch = match.replace(/^(GitHub|Github|github):\s*/i, '');
+        cleanMatch = cleanMatch.replace(/[()[\]]/g, ''); // Remove brackets/parentheses
+        
+        // Normalize the URL
+        let normalizedUrl = cleanMatch;
+        if (!normalizedUrl.startsWith('http')) {
+          normalizedUrl = 'https://' + normalizedUrl;
+        }
+        if (!githubLinks.includes(normalizedUrl)) {
+          githubLinks.push(normalizedUrl);
+          console.log('Added GitHub link:', normalizedUrl);
+        }
+      });
+    }
+  });
+  
+  console.log('Final GitHub links found:', githubLinks);
+  return githubLinks;
+}
+
+// Extract projects from resume text
+function extractProjects(text) {
+  const projects = [];
+  const lines = text.split('\n');
+  let currentProject = null;
+  let inProjectSection = false;
+  
+  console.log('Extracting projects from', lines.length, 'lines');
+  
+  // Keywords that indicate project sections
+  const projectSectionKeywords = [
+    'projects', 'project', 'portfolio', 'work experience', 'experience', 
+    'accomplishments', 'achievements', 'applications', 'development',
+    'technical projects', 'personal projects', 'academic projects'
+  ];
+  
+  // Keywords that indicate project items
+  const projectIndicators = [
+    'built', 'developed', 'created', 'designed', 'implemented', 
+    'led', 'managed', 'architected', 'deployed', 'launched',
+    'programmed', 'coded', 'engineered', 'constructed', 'established'
+  ];
+  
+  // Section headers that should stop project parsing
+  const sectionHeaders = [
+    'education', 'skills', 'skill summary', 'certifications', 'contact', 
+    'summary', 'objective', 'achievements', 'volunteer', 'awards'
+  ];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    const lowerLine = line.toLowerCase();
+    
+    // Skip empty lines and single characters
+    if (!line || line.length <= 2) continue;
+    
+    // Check if we're entering a project section
+    if (projectSectionKeywords.some(keyword => 
+        lowerLine === keyword || lowerLine === keyword + 's' || lowerLine.startsWith(keyword + ':'))) {
+      inProjectSection = true;
+      console.log('Entering project section at line:', i, line);
+      continue;
+    }
+    
+    // Check if we're leaving project section
+    if (sectionHeaders.some(header => 
+        lowerLine === header || lowerLine.startsWith(header))) {
+      if (inProjectSection) {
+        console.log('Leaving project section at line:', i, line);
+      }
+      inProjectSection = false;
+      continue;
+    }
+    
+    if (inProjectSection) {
+      // Check if this is a project title
+      // Project titles usually:
+      // 1. Have a reasonable length (5-80 characters)
+      // 2. May contain a date
+      // 3. Are not bullet points that start with "•" followed by lowercase
+      // 4. Don't start with common bullet point text
+      
+      const isProjectTitle = (
+        line.length >= 5 && line.length <= 80 &&
+        !line.startsWith('•') &&
+        !line.toLowerCase().startsWith('used ') &&
+        !line.toLowerCase().startsWith('implemented ') &&
+        !line.toLowerCase().startsWith('developed ') &&
+        !line.toLowerCase().startsWith('created ') &&
+        !line.toLowerCase().startsWith('built ') &&
+        (
+          // Contains a date pattern (month/year)
+          line.match(/\b(January|February|March|April|May|June|July|August|September|October|November|December|\d{4})\b/i) ||
+          // Starts with capital letter and looks like a title
+          (line[0] === line[0].toUpperCase() && 
+           !line.includes(' a ') && 
+           !line.includes(' the ') &&
+           line.split(' ').length <= 8)
+        )
+      );
+      
+      if (isProjectTitle) {
+        console.log('Found project title:', line);
+        
+        // Save previous project
+        if (currentProject && currentProject.name && currentProject.name.length > 3) {
+          projects.push(currentProject);
+          console.log('Saved project:', currentProject.name);
+        }
+        
+        // Start new project - remove date from name
+        const projectName = line.replace(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s*\d{4}\b/gi, '').trim();
+        const datePart = line.match(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s*\d{4}\b/gi);
+        
+        currentProject = {
+          name: projectName,
+          description: '',
+          technologies: [],
+          date: datePart ? datePart[0] : ''
+        };
+        console.log('Started new project:', projectName);
+      } else if (currentProject && line.length > 10) {
+        // Add to project description, but skip obvious technology lists
+        if (!line.match(/^[A-Za-z\s,]+Github/i) && !line.toLowerCase().includes('github —')) {
+          // Check if this line is mostly bullet points describing the project
+          if (line.startsWith('•') || line.toLowerCase().includes('implemented') || 
+              line.toLowerCase().includes('developed') || line.toLowerCase().includes('used')) {
+            currentProject.description += (currentProject.description ? ' ' : '') + line.replace(/^•\s*/, '');
+            console.log('Added to description:', line.substring(0, 50) + '...');
+          }
+        }
+        
+        // Extract technologies from this line
+        const techsInLine = extractSkills(line);
+        if (techsInLine.length > 0) {
+          currentProject.technologies = [...new Set([...currentProject.technologies, ...techsInLine])];
+          console.log('Added technologies:', techsInLine);
+        }
+      }
+    }
+  }
+  
+  // Don't forget the last project
+  if (currentProject && currentProject.name && currentProject.name.length > 3) {
+    projects.push(currentProject);
+    console.log('Saved final project:', currentProject.name);
+  }
+  
+  // Filter out invalid projects
+  const validProjects = projects.filter(project => 
+    project.name.length > 3 && 
+    project.name.length < 100 &&
+    !project.name.toLowerCase().includes('achieved') &&
+    !project.name.toLowerCase().includes('awarded')
+  );
+  
+  console.log('Final valid projects found:', validProjects.length);
+  return validProjects;
+}
+
+// Extract achievements from resume text
+function extractAchievements(text) {
+  const achievements = [];
+  const lines = text.split('\n');
+  let inAchievementSection = false;
+  
+  console.log('Extracting achievements from', lines.length, 'lines');
+  
+  // Keywords that indicate achievement sections
+  const achievementSectionKeywords = [
+    'achievements', 'accomplishments', 'awards', 'honors', 'recognition',
+    'certifications', 'certificates', 'notable achievements', 'accolades'
+  ];
+  
+  // Keywords that indicate achievement items
+  const achievementIndicators = [
+    'awarded', 'recognized', 'achieved', 'accomplished', 'received', 'earned',
+    'won', 'ranked', 'scored', 'selected', 'nominated', 'certified', 'placed'
+  ];
+  
+  // Section headers that should stop achievement parsing
+  const sectionHeaders = [
+    'education', 'skills', 'skill summary', 'contact', 'summary', 'objective',
+    'projects', 'experience', 'work experience', 'volunteer'
+  ];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    const lowerLine = line.toLowerCase();
+    
+    // Skip empty lines and single characters
+    if (!line || line.length <= 2) continue;
+    
+    // Check if we're entering an achievement section
+    if (achievementSectionKeywords.some(keyword => 
+        lowerLine === keyword || lowerLine === keyword + 's' || lowerLine.startsWith(keyword + ':'))) {
+      inAchievementSection = true;
+      console.log('Entering achievement section at line:', i, line);
+      continue;
+    }
+    
+    // Check if we're leaving achievement section
+    if (sectionHeaders.some(header => 
+        lowerLine === header || lowerLine.startsWith(header))) {
+      if (inAchievementSection) {
+        console.log('Leaving achievement section at line:', i, line);
+      }
+      inAchievementSection = false;
+      continue;
+    }
+    
+    if (inAchievementSection) {
+      // Process achievement lines
+      if (line.length >= 10 && line.length <= 200) {
+        const achievement = {
+          title: line.replace(/^[•\-\*]\s*/, '').trim(),
+          type: classifyAchievementType(line)
+        };
+        
+        if (achievement.title.length >= 10) {
+          achievements.push(achievement);
+          console.log('Found achievement:', achievement.title);
+        }
+      }
+    } else {
+      // Also look for achievements outside dedicated sections
+      if (achievementIndicators.some(indicator => lowerLine.includes(indicator)) &&
+          line.length >= 15 && line.length <= 200) {
+        const achievement = {
+          title: line.replace(/^[•\-\*]\s*/, '').trim(),
+          type: classifyAchievementType(line)
+        };
+        
+        achievements.push(achievement);
+        console.log('Found achievement outside section:', achievement.title);
+      }
+    }
+  }
+  
+  // Remove duplicates and filter valid achievements
+  const validAchievements = achievements.filter((achievement, index, self) => 
+    index === self.findIndex(a => a.title === achievement.title) &&
+    achievement.title.length >= 10 &&
+    !achievement.title.toLowerCase().includes('project') &&
+    !achievement.title.toLowerCase().includes('developed') &&
+    !achievement.title.toLowerCase().includes('built')
+  );
+  
+  console.log('Final valid achievements found:', validAchievements.length);
+  return validAchievements;
+}
+
+// Classify achievement type
+function classifyAchievementType(achievementText) {
+  const lowerText = achievementText.toLowerCase();
+  
+  if (lowerText.includes('award') || lowerText.includes('prize')) {
+    return 'Award';
+  } else if (lowerText.includes('certification') || lowerText.includes('certified')) {
+    return 'Certification';
+  } else if (lowerText.includes('recognition') || lowerText.includes('recognized')) {
+    return 'Recognition';
+  } else if (lowerText.includes('scholarship') || lowerText.includes('grant')) {
+    return 'Scholarship';
+  } else if (lowerText.includes('rank') || lowerText.includes('position') || lowerText.includes('place')) {
+    return 'Ranking';
+  } else {
+    return 'Achievement';
+  }
+}
+
 const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
@@ -69,6 +372,17 @@ const userSchema = new mongoose.Schema({
   skills: { type: [String], default: [] },
   bio: { type: String, default: "" },
   availability: { type: String, default: "Not specified" },
+  githubLinks: { type: [String], default: [] },
+  projects: [{
+    name: { type: String, required: true },
+    description: { type: String, default: "" },
+    technologies: { type: [String], default: [] },
+    githubUrl: { type: String, default: "" }
+  }],
+  achievements: [{
+    title: { type: String, required: true },
+    type: { type: String, default: "Achievement" }
+  }],
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date }
 });
@@ -247,7 +561,10 @@ app.post("/api/signup", upload.single('resume'), async (req, res) => {
         message: "Password must be at least 6 characters long" 
       });
     }
-    // If resume file is uploaded, extract skills
+    // If resume file is uploaded, extract skills, GitHub links, projects, and achievements
+    let githubLinks = [];
+    let projects = [];
+    let achievements = [];
     if (req.file) {
       let text = '';
       const filePath = req.file.path;
@@ -263,6 +580,19 @@ app.post("/api/signup", upload.single('resume'), async (req, res) => {
       fs.unlinkSync(filePath);
       if (text) {
         skills = extractSkills(text);
+        githubLinks = extractGitHubLinks(text);
+        projects = extractProjects(text);
+        achievements = extractAchievements(text);
+        
+        // Match GitHub links to projects if possible
+        projects.forEach(project => {
+          githubLinks.forEach(link => {
+            if (link.toLowerCase().includes(project.name.toLowerCase().replace(/\s+/g, '')) ||
+                project.name.toLowerCase().includes(link.split('/').pop().toLowerCase())) {
+              project.githubUrl = link;
+            }
+          });
+        });
       }
     } else if (typeof skills === 'string') {
       // If skills is a comma-separated string from form, split it
@@ -286,7 +616,10 @@ app.post("/api/signup", upload.single('resume'), async (req, res) => {
         password: hashedPassword, 
         skills: skills || [],
         bio: bio || "",
-        availability: availability || "Not specified"
+        availability: availability || "Not specified",
+        githubLinks: githubLinks || [],
+        projects: projects || [],
+        achievements: achievements || []
       });
       await newUser.save();
       // Return user data without password
@@ -314,6 +647,9 @@ app.post("/api/signup", upload.single('resume'), async (req, res) => {
         skills: skills || [],
         bio: bio || "",
         availability: availability || "Not specified",
+        githubLinks: githubLinks || [],
+        projects: projects || [],
+        achievements: achievements || [],
         createdAt: new Date().toISOString()
       };
       users.push(newUser);
@@ -329,6 +665,67 @@ app.post("/api/signup", upload.single('resume'), async (req, res) => {
     res.status(500).json({ 
       success: false,
       message: "Server error during signup process" 
+    });
+  }
+});
+
+// Debug endpoint to test resume text extraction
+app.post("/api/debug/resume-text", upload.single('resume'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false,
+        message: "No resume file uploaded" 
+      });
+    }
+
+    let text = '';
+    const filePath = req.file.path;
+    
+    if (req.file.mimetype === 'application/pdf') {
+      const dataBuffer = fs.readFileSync(filePath);
+      const pdfData = await pdfParse(dataBuffer);
+      text = pdfData.text;
+    } else if (req.file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
+               req.file.mimetype === 'application/msword') {
+      const docData = await mammoth.extractRawText({ path: filePath });
+      text = docData.value;
+    }
+    
+    // Clean up file after extraction
+    fs.unlinkSync(filePath);
+    
+    if (text) {
+      const skills = extractSkills(text);
+      const githubLinks = extractGitHubLinks(text);
+      const projects = extractProjects(text);
+      const achievements = extractAchievements(text);
+      
+      res.json({
+        success: true,
+        data: {
+          originalText: text,
+          textLength: text.length,
+          extractedSkills: skills,
+          extractedGithubLinks: githubLinks,
+          extractedProjects: projects,
+          extractedAchievements: achievements,
+          firstFewLines: text.split('\n').slice(0, 10),
+          searchableText: text.toLowerCase()
+        }
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: "Could not extract text from resume file"
+      });
+    }
+  } catch (error) {
+    console.error("Debug resume parsing error:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Server error during resume text extraction",
+      error: error.message
     });
   }
 });
@@ -579,6 +976,59 @@ app.get("/api/profile", authenticateUser, async (req, res) => {
   }
 });
 
+// Get user profile with GitHub links and projects (public endpoint)
+app.get("/api/user/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    if (mongoose.connection.readyState === 1) {
+      const user = await User.findById(userId).select('-password');
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found"
+        });
+      }
+      
+      res.json({
+        success: true,
+        user: {
+          id: user._id,
+          fullName: user.fullName,
+          email: user.email,
+          skills: user.skills,
+          bio: user.bio,
+          availability: user.availability,
+          githubLinks: user.githubLinks || [],
+          projects: user.projects || [],
+          createdAt: user.createdAt
+        }
+      });
+    } else {
+      // Fallback to in-memory storage
+      const user = users.find(u => u.id.toString() === userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found"
+        });
+      }
+      
+      const { password, ...userWithoutPassword } = user;
+      res.json({
+        success: true,
+        user: userWithoutPassword
+      });
+    }
+  } catch (error) {
+    console.error("User profile error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching user profile"
+    });
+  }
+});
+
 // Teammates search endpoint
 app.get("/api/search/teammates", async (req, res) => {
   try {
@@ -620,11 +1070,14 @@ app.get("/api/search/teammates", async (req, res) => {
             skills: user.skills,
             availability: user.availability,
             bio: user.bio,
+            githubLinks: user.githubLinks || [],
+            projects: user.projects || [],
             avatar: user.avatar || "https://randomuser.me/api/portraits/lego/1.jpg"
           }))
         ];
         
         console.log('MongoDB search results:', allResults.length, 'teammates/users found');
+        console.log('Sample result with GitHub/Projects:', JSON.stringify(allResults[0], null, 2));
         
         return res.json({
           success: true,

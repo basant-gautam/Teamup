@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Resume Parsing - GitHub & Projects</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .form-section, .results-section {
+            margin-bottom: 30px;
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 14px;
+            resize: vertical;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 15px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .results {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        .section h3 {
+            color: #333;
+            margin-bottom: 10px;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 5px;
+        }
+        .skill-tag {
+            display: inline-block;
+            background: #007bff;
+            color: white;
+            padding: 4px 8px;
+            margin: 2px;
+            border-radius: 15px;
+            font-size: 12px;
+        }
+        .github-link {
+            display: block;
+            color: #007bff;
+            text-decoration: none;
+            margin: 5px 0;
+            padding: 8px;
+            background: #e9ecef;
+            border-radius: 5px;
+        }
+        .github-link:hover {
+            background: #dee2e6;
+        }
+        .project {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        .project h4 {
+            color: #333;
+            margin: 0 0 10px 0;
+        }
+        .project-description {
+            color: #666;
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+        .project-tech {
+            margin-top: 10px;
+        }
+        .project-github {
+            color: #007bff;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .sample-resume {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-line;
+        }
+        .load-sample {
+            background: #28a745;
+            margin-bottom: 15px;
+        }
+        .load-sample:hover {
+            background: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Resume Parsing Test - GitHub Links & Projects</h1>
+        <p>Test the enhanced resume parsing functionality that extracts skills, GitHub links, and projects from resume text.</p>
+        
+        <div class="form-section">
+            <h2>📄 Resume Text Input</h2>
+            <button class="load-sample" onclick="loadSampleResume()">Load Sample Resume</button>
+            <textarea id="resumeText" placeholder="Paste resume text here or click 'Load Sample Resume' to test with sample data..."></textarea>
+            <button onclick="parseResume()">🚀 Parse Resume</button>
+        </div>
+
+        <div class="results-section" id="resultsSection" style="display: none;">
+            <h2>📊 Parsing Results</h2>
+            <div class="results" id="results"></div>
+        </div>
+    </div>
+
+    <script>
+        function loadSampleResume() {
+            const sampleResume = `John Doe
+Software Developer
+
+Email: john.doe@email.com
+GitHub: https://github.com/johndoe
+Portfolio: https://github.com/johndoe/portfolio
+
+EXPERIENCE
+Senior Software Developer | Tech Corp | 2021-Present
+• Led development of microservices architecture using Node.js and Express
+• Implemented CI/CD pipelines with Jenkins and Docker
+• Worked with React, TypeScript, and MongoDB
+
+PROJECTS
+
+E-Commerce Platform
+Built a full-stack e-commerce application using React, Node.js, and PostgreSQL. Implemented payment processing with Stripe API and deployed on AWS. Features include user authentication, shopping cart, and admin dashboard.
+GitHub: https://github.com/johndoe/ecommerce-app
+Technologies: React, Node.js, PostgreSQL, Stripe, AWS
+
+Task Management App
+Developed a collaborative task management application with real-time updates using Socket.io. Implemented drag-and-drop functionality and integrated with Google Calendar API.
+GitHub: https://github.com/johndoe/task-manager
+Technologies: Vue.js, Express.js, MongoDB, Socket.io
+
+Data Visualization Dashboard
+Created an interactive dashboard for analyzing sales data using Python and D3.js. Implemented machine learning models for sales prediction and automated report generation.
+Technologies: Python, Django, PostgreSQL, D3.js, Scikit-learn
+
+SKILLS
+Programming: JavaScript, Python, Java, TypeScript
+Web Technologies: React, Vue.js, Angular, HTML, CSS
+Backend: Node.js, Express, Django, Flask
+Databases: MongoDB, PostgreSQL, MySQL
+Cloud: AWS, Docker, Kubernetes
+Tools: Git, Jenkins, Jira`;
+
+            document.getElementById('resumeText').value = sampleResume;
+        }
+
+        async function parseResume() {
+            const text = document.getElementById('resumeText').value.trim();
+            
+            if (!text) {
+                alert('Please enter resume text or load a sample resume');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/resume/parse-resume', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        userId: 'test-user-' + Date.now(),
+                        text: text,
+                        name: 'Test User'
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displayResults(data);
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to parse resume'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Network error: ' + error.message);
+            }
+        }
+
+        function displayResults(data) {
+            const resultsDiv = document.getElementById('results');
+            const resultsSection = document.getElementById('resultsSection');
+            
+            let html = '';
+
+            // Skills section
+            if (data.userSkills && data.userSkills.length > 0) {
+                html += `
+                    <div class="section">
+                        <h3>🛠️ Extracted Skills (${data.userSkills.length})</h3>
+                        <div>
+                            ${data.userSkills.map(skill => `<span class="skill-tag">${skill}</span>`).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // GitHub links section
+            if (data.githubLinks && data.githubLinks.length > 0) {
+                html += `
+                    <div class="section">
+                        <h3>🔗 GitHub Links (${data.githubLinks.length})</h3>
+                        <div>
+                            ${data.githubLinks.map(link => `<a href="${link}" target="_blank" class="github-link">${link}</a>`).join('')}
+                        </div>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="section">
+                        <h3>🔗 GitHub Links</h3>
+                        <p style="color: #666;">No GitHub links found in resume</p>
+                    </div>
+                `;
+            }
+
+            // Projects section
+            if (data.projects && data.projects.length > 0) {
+                html += `
+                    <div class="section">
+                        <h3>🚀 Extracted Projects (${data.projects.length})</h3>
+                        <div>
+                            ${data.projects.map(project => `
+                                <div class="project">
+                                    <h4>${project.name}</h4>
+                                    ${project.description ? `<div class="project-description">${project.description}</div>` : ''}
+                                    ${project.technologies && project.technologies.length > 0 ? `
+                                        <div class="project-tech">
+                                            <strong>Technologies:</strong> 
+                                            ${project.technologies.map(tech => `<span class="skill-tag">${tech}</span>`).join('')}
+                                        </div>
+                                    ` : ''}
+                                    ${project.githubUrl ? `
+                                        <div style="margin-top: 10px;">
+                                            <a href="${project.githubUrl}" target="_blank" class="project-github">🔗 View on GitHub</a>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="section">
+                        <h3>🚀 Projects</h3>
+                        <p style="color: #666;">No projects found in resume</p>
+                    </div>
+                `;
+            }
+
+            // Matches section
+            if (data.matches && data.matches.length > 0) {
+                html += `
+                    <div class="section">
+                        <h3>🤝 Potential Matches (${data.matches.length})</h3>
+                        <div>
+                            ${data.matches.map(match => `
+                                <div class="project">
+                                    <h4>${match.name}</h4>
+                                    <p><strong>Shared Skills:</strong> ${match.sharedSkills.join(', ')}</p>
+                                    ${match.sharedProjects && match.sharedProjects.length > 0 ? 
+                                        `<p><strong>Shared Project Types:</strong> ${match.sharedProjects.join(', ')}</p>` : ''}
+                                    <p><strong>Total Matches:</strong> ${match.totalMatches}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="section">
+                        <h3>🤝 Potential Matches</h3>
+                        <p style="color: #666;">No matches found (database may be empty)</p>
+                    </div>
+                `;
+            }
+
+            resultsDiv.innerHTML = html;
+            resultsSection.style.display = 'block';
+            resultsSection.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>
