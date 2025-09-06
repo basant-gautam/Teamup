@@ -17,51 +17,51 @@ document.addEventListener('DOMContentLoaded', () => {
       const skills = Array.from(document.getElementById('skills').selectedOptions).map(opt => opt.value);
       const bio = document.getElementById('bio').value;
       const availability = document.getElementById('availability').value;
+      const resumeFile = document.getElementById('resume') ? document.getElementById('resume').files[0] : null;
 
       // Validate password match
       if (password !== confirmPassword) {
         alert('Passwords do not match!');
         return;
       }
-      
+
       try {
         // Show loading state
         const submitBtn = signupForm.querySelector('button[type="submit"]');
         const originalBtnText = submitBtn.textContent;
         submitBtn.disabled = true;
         submitBtn.textContent = 'Signing Up...';
-        
-        // Create user object
-        const userData = { 
-          fullName, 
-          email, 
-          password, 
-          skills, 
-          bio, 
-          availability 
-        };
-        
+
+        // Create FormData for file upload
+        const formData = new FormData();
+        formData.append('fullName', fullName);
+        formData.append('email', email);
+        formData.append('password', password);
+        formData.append('skills', skills.join(','));
+        formData.append('bio', bio);
+        formData.append('availability', availability);
+        if (resumeFile) {
+          formData.append('resume', resumeFile);
+        }
+
         // Send API request
         const response = await fetch('/api/signup', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(userData)
+          body: formData
         });
-        
+
         const data = await response.json();
-        
+
         if (!data.success) {
           throw new Error(data.message || 'Failed to sign up');
         }
-        
+
         alert('Signup successful! Please log in.');
         window.location.href = 'login.html';
       } catch (error) {
         console.error('Signup error:', error);
         alert(`Signup failed: ${error.message || 'Please try again'}`);
-        
+
         // Reset button
         const submitBtn = signupForm.querySelector('button[type="submit"]');
         submitBtn.disabled = false;

@@ -416,6 +416,24 @@
       padding: 15px;
       margin: 15px 0;
     }
+    .login-btn {
+    width: 100%;
+    padding: 13px;
+    border: none;
+    border-radius: 25px;
+    background: linear-gradient(90deg, #007bff 0%, #ff0096 100%);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    transition: background 0.3s, transform 0.2s;
+  }
+
+  .login-btn:hover {
+    background: linear-gradient(90deg, #0056b3 0%, #ff4fa0 100%);
+    transform: translateY(-2px) scale(1.03);
+  }
   </style>
 </head>
 <body>
@@ -469,12 +487,12 @@
   <div id="connectionModal" class="modal">
     <div class="modal-content">
       <h3>Wanna connect?</h3>
-      <p>Say hello to <span id="connectionName"></span> on</p>     
+      <p>Say hello to <span id="connectionName"></span> on</p> 
+      <button class="login-btn"><a href="https://drive.google.com/file/d/1QOmc6r0tAAY_upObbF5RE-SGpLpjK6xH/view?usp=sharing" target="_blank" style="text-decoration: none;color: papayawhip;">Resume</a></button> 
       <div class="contact-info">
-        <p><strong>Teammate ID:</strong> <span id="connectionId"></span></p>
+        <p><strong>Teammate ID:</strong><span id="connectionId"></span></p>
         <p><strong>Contact Number:</strong> <span id="connectionPhone"></span></p>
-      </div>
-      
+      </div>      
       <button class="close-modal" onclick="closeModal()">Close</button>
     </div>
   </div>

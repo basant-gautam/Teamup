@@ -339,6 +339,7 @@
     padding: 25px 5vw;
     margin-bottom: 60px;
   }
+}
   </style>
 
   <!-- FontAwesome for icons -->
@@ -361,7 +362,9 @@
 
   <div class="signup-box">
     <h2>Sign Up</h2>
-    <form id="signupForm">
+  <form id="signupForm" enctype="multipart/form-data">
+  <label for="resume">Upload Resume (PDF or DOCX)</label>
+  <input type="file" id="resume" name="resume" accept="application/pdf,.doc,.docx" style="margin-bottom:18px; color:#fff; background:rgba(255,255,255,0.12); border-radius:10px; padding:8px; width:100%;" />
       <div class="input-box">
         <input type="text" id="fullName" placeholder="Full Name" required />
         <i class="fas fa-user"></i>

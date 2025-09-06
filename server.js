@@ -1,3 +1,36 @@
+// Resume extraction dependencies
+const multer = require('multer');
+const pdfParse = require('pdf-parse');
+const mammoth = require('mammoth');
+const fs = require('fs');
+
+// Multer setup for file upload
+const upload = multer({ dest: 'uploads/' });
+
+// Skill keywords and extraction logic (from resume.js)
+const SKILLS_KEYWORDS = {
+  python: ["python", "django", "flask", "pandas", "numpy", "scikit-learn", "sklearn"],
+  javascript: ["javascript", "react", "angular", "vue", "nodejs", "express", "next.js", "typescript"],
+  web_dev: ["html", "css", "tailwind", "bootstrap", "responsive design"],
+  data_science: ["data science", "machine learning", "ml", "deep learning", "pytorch", "tensorflow", "data analysis"],
+  database: ["sql", "nosql", "mongodb", "postgresql", "mysql", "firebase"],
+  cloud: ["aws", "azure", "gcp", "docker", "kubernetes"],
+  mobile: ["flutter", "react native", "ios", "android", "swift"],
+  design: ["figma", "sketch", "adobe xd", "ui/ux", "photoshop", "illustrator"]
+};
+function extractSkills(text) {
+  const extracted = new Set();
+  const cleanedText = text.toLowerCase();
+  Object.values(SKILLS_KEYWORDS).forEach(keywords => {
+    keywords.forEach(keyword => {
+      const regex = new RegExp(`\\b${keyword}\\b`, "i");
+      if (regex.test(cleanedText)) {
+        extracted.add(keyword);
+      }
+    });
+  });
+  return Array.from(extracted);
+}
 const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
@@ -23,6 +56,10 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, '/')));
+
+// Integrate resume.js routes
+const resumeRoutes = require('./routes/resume');
+app.use('/api/resume', resumeRoutes);
 
 // Define Mongoose Schemas and Models
 const userSchema = new mongoose.Schema({
@@ -54,6 +91,9 @@ const teammateSchema = new mongoose.Schema({
 const User = mongoose.model('User', userSchema);
 const Session = mongoose.model('Session', sessionSchema);
 const Teammate = mongoose.model('Teammate', teammateSchema);
+
+// Export User model for use in other files
+module.exports.User = User;
 
 // Sessions storage for compatibility during transition
 let sessions = {};
@@ -184,10 +224,10 @@ const isValidEmail = (email) => {
 };
 
 // Signup
-app.post("/api/signup", async (req, res) => {
+app.post("/api/signup", upload.single('resume'), async (req, res) => {
   try {
-    const { fullName, email, password, skills, bio, availability } = req.body;
-    
+    const { fullName, email, password, bio, availability } = req.body;
+    let skills = req.body.skills || [];
     // Validation
     if (!fullName || !email || !password) {
       return res.status(400).json({ 
@@ -195,21 +235,39 @@ app.post("/api/signup", async (req, res) => {
         message: "Please provide name, email and password" 
       });
     }
-    
     if (!isValidEmail(email)) {
       return res.status(400).json({ 
         success: false,
         message: "Please provide a valid email address" 
       });
     }
-    
     if (password.length < 6) {
       return res.status(400).json({ 
         success: false,
         message: "Password must be at least 6 characters long" 
       });
     }
-    
+    // If resume file is uploaded, extract skills
+    if (req.file) {
+      let text = '';
+      const filePath = req.file.path;
+      if (req.file.mimetype === 'application/pdf') {
+        const dataBuffer = fs.readFileSync(filePath);
+        const pdfData = await pdfParse(dataBuffer);
+        text = pdfData.text;
+      } else if (req.file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || req.file.mimetype === 'application/msword') {
+        const docData = await mammoth.extractRawText({ path: filePath });
+        text = docData.value;
+      }
+      // Clean up file after extraction
+      fs.unlinkSync(filePath);
+      if (text) {
+        skills = extractSkills(text);
+      }
+    } else if (typeof skills === 'string') {
+      // If skills is a comma-separated string from form, split it
+      skills = skills.split(',').map(s => s.trim()).filter(Boolean);
+    }
     // Check if MongoDB is available
     if (mongoose.connection.readyState === 1) {
       // Check if user already exists in MongoDB
@@ -220,7 +278,6 @@ app.post("/api/signup", async (req, res) => {
           message: "User with this email already exists" 
         });
       }
-      
       // Create new user in MongoDB
       const hashedPassword = hashPassword(password);
       const newUser = new User({ 
@@ -231,13 +288,10 @@ app.post("/api/signup", async (req, res) => {
         bio: bio || "",
         availability: availability || "Not specified"
       });
-      
       await newUser.save();
-      
       // Return user data without password
       const userObject = newUser.toObject();
       const { password: _, ...userWithoutPassword } = userObject;
-      
       res.status(201).json({ 
         success: true,
         message: "Signup successful", 
@@ -245,15 +299,12 @@ app.post("/api/signup", async (req, res) => {
       });
     } else {
       // Fallback to in-memory storage
-      // Check if user already exists in memory
       if (users.find(u => u.email.toLowerCase() === email.toLowerCase())) {
         return res.status(409).json({ 
           success: false,
           message: "User with this email already exists" 
         });
       }
-      
-      // Create new user
       const hashedPassword = hashPassword(password);
       const newUser = { 
         id: users.length + 1,
@@ -265,12 +316,8 @@ app.post("/api/signup", async (req, res) => {
         availability: availability || "Not specified",
         createdAt: new Date().toISOString()
       };
-      
       users.push(newUser);
-      
-      // Return user data without password
       const { password: _, ...userWithoutPassword } = newUser;
-      
       res.status(201).json({ 
         success: true,
         message: "Signup successful", 
@@ -533,7 +580,7 @@ app.get("/api/profile", authenticateUser, async (req, res) => {
 });
 
 // Teammates search endpoint
-app.get("/api/search/teammates", authenticateUser, async (req, res) => {
+app.get("/api/search/teammates", async (req, res) => {
   try {
     console.log('Search request received:', req.query);
     // Get search parameters
@@ -558,13 +605,30 @@ app.get("/api/search/teammates", authenticateUser, async (req, res) => {
         
         console.log('MongoDB search query:', query);
         
-        // Find teammates matching the search criteria
-        const teammates = await Teammate.find(query);
-        console.log('MongoDB search results:', teammates.length, 'teammates found');
+        // Search in both User and Teammate collections
+        const [teammates, users] = await Promise.all([
+          Teammate.find(query),
+          User.find(query).select('-password') // Exclude password field
+        ]);
+        
+        // Combine results from both collections
+        const allResults = [
+          ...teammates,
+          ...users.map(user => ({
+            _id: user._id,
+            name: user.fullName,
+            skills: user.skills,
+            availability: user.availability,
+            bio: user.bio,
+            avatar: user.avatar || "https://randomuser.me/api/portraits/lego/1.jpg"
+          }))
+        ];
+        
+        console.log('MongoDB search results:', allResults.length, 'teammates/users found');
         
         return res.json({
           success: true,
-          teammates
+          teammates: allResults
         });
       } catch (mongoError) {
         console.error("MongoDB search error:", mongoError);
@@ -604,7 +668,7 @@ app.get("/api/search/teammates", authenticateUser, async (req, res) => {
 });
 
 // Original teammates endpoint with filtering and pagination
-app.get("/api/teammates", authenticateUser, async (req, res) => {
+app.get("/api/teammates", async (req, res) => {
   try {
     // Get query parameters
     const { skill, availability, page = 1, limit = 10 } = req.query;
@@ -855,6 +919,36 @@ app.get('/api/db-status', authenticateUser, async (req, res) => {
   }
 });
 
+// Debug route to see all users and teammates
+app.get("/api/debug/all-data", async (req, res) => {
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const users = await User.find({}).select('-password');
+      const teammates = await Teammate.find({});
+      
+      res.json({
+        success: true,
+        users: users,
+        teammates: teammates,
+        userCount: users.length,
+        teammateCount: teammates.length
+      });
+    } else {
+      res.json({
+        success: false,
+        message: "MongoDB not connected",
+        inMemoryTeammates: inMemoryTeammates
+      });
+    }
+  } catch (error) {
+    console.error('Debug route error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Server error:', err);
@@ -949,3 +1043,7 @@ function startServer() {
     console.log(`📁 API endpoints available at http://localhost:${PORT}/api/`);
   });
 }
+// Duplicate server/bootstrap block removed — the main server is started via startServer() above.
+// If you need to add extra routes or middleware, require them and register with the existing app
+// before calling startServer(), or adjust startServer() to perform additional setup.
+
